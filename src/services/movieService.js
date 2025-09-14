@@ -48,6 +48,18 @@ export const deleteMovie = async (movieId) => {
     }
 };
 
+export const getUserReviews = async (userId) => {
+    try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`${API_BASE_URL}/reviews/user/${userId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        return response.data;
+    } catch (error) {
+        throw new Error('Failed to fetch user reviews');
+    }
+};
+
 export const submitReview = (movieId, reviewData) =>
     axios.post(`${API_BASE_URL}/movies/${movieId}/reviews`, reviewData, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }

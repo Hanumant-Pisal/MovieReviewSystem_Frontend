@@ -3,8 +3,9 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { setCredentials } from '../redux/slices/authSlice';
 import { API_BASE_URL } from '../utils/apiConfig';
-import { getMovies, deleteMovie } from '../services/movieService';
-
+import { getMovies, deleteMovie, getUserReviews } from '../services/movieService';
+import { deleteReview } from '../services/reviewService';
+import { MdDelete } from "react-icons/md";
 const ProfilePage = () => {
     const { user, isAuthenticated } = useSelector(state => state.auth);
     const dispatch = useDispatch();
@@ -37,6 +38,8 @@ const ProfilePage = () => {
     const [movies, setMovies] = useState([]);
     const [moviesLoading, setMoviesLoading] = useState(false);
     const [showAddMovieModal, setShowAddMovieModal] = useState(false);
+    const [userReviews, setUserReviews] = useState([]);
+    const [reviewsLoading, setReviewsLoading] = useState(false);
     
     // User stats states
     const [userStats, setUserStats] = useState({
@@ -45,6 +48,7 @@ const ProfilePage = () => {
         moviesWatched: 0
     });
     const [statsLoading, setStatsLoading] = useState(false);
+    const [showReviews, setShowReviews] = useState(false);
     
     const isAdmin = user?.role === 'admin';
 
@@ -168,6 +172,7 @@ const ProfilePage = () => {
     useEffect(() => {
         if (user && !isAdmin) {
             fetchUserStats();
+            fetchUserReviews();
         }
     }, [user, isAdmin]);
     
@@ -291,6 +296,34 @@ const ProfilePage = () => {
         }
     };
 
+    const fetchUserReviews = async () => {
+        setReviewsLoading(true);
+        try {
+            const reviewsData = await getUserReviews(user.id);
+            setUserReviews(reviewsData.reviews || reviewsData || []);
+        } catch (error) {
+            console.error('Failed to fetch user reviews:', error);
+            setUserReviews([]);
+        } finally {
+            setReviewsLoading(false);
+        }
+    };
+
+    const handleDeleteReview = async (reviewId) => {
+        if (!confirm('Are you sure you want to delete this review?')) return;
+        
+        try {
+            await deleteReview(reviewId);
+            // Remove the deleted review from the state
+            setUserReviews(userReviews.filter(review => review._id !== reviewId));
+            // Update user stats
+            fetchUserStats();
+        } catch (error) {
+            console.error('Failed to delete review:', error);
+            alert('Failed to delete review. Please try again.');
+        }
+    };
+
     const handleAddMovie = async (e) => {
         e.preventDefault();
         try {
@@ -374,102 +407,88 @@ const ProfilePage = () => {
                                 </div>
                                 <h2 className="text-2xl font-bold text-white mb-1">{user.username}</h2>
                                 <p className="text-gray-400">{user.email}</p>
-  
-                                {isAdmin && (
-                                    <div className="mt-2">
-                                        <span className="px-3 py-1 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 rounded-full text-yellow-400 text-sm font-medium">
-                                             Admin
-                                        </span>
-                                    </div>
-                                )}
+                                
+                                <div className="mt-2">
+                                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                        isAdmin 
+                                            ? 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 text-yellow-400'
+                                            : 'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-500/30 text-blue-400'
+                                    }`}>
+                                        {isAdmin ? 'Admin' : 'User'}
+                                    </span>
+                                </div>
                             </div>
 
-                            {/* Quick Stats - Only for regular users */}
-                            {!isAdmin && (
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl">
-                                        <span className="text-gray-300">Movies Watched</span>
-                                        <span className="text-white font-semibold">
-                                            {statsLoading ? (
-                                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                            ) : (
-                                                userStats.moviesWatched
-                                            )}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl">
-                                        <span className="text-gray-300">Reviews Written</span>
-                                        <span className="text-white font-semibold">
-                                            {statsLoading ? (
-                                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                            ) : (
-                                                userStats.reviewsWritten
-                                            )}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl">
-                                        <span className="text-gray-300">Watchlist Items</span>
-                                        <span className="text-white font-semibold">
-                                            {statsLoading ? (
-                                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                            ) : (
-                                                userStats.watchlistItems
-                                            )}
-                                        </span>
-                                    </div>
-                                </div>
-                            )}
 
-                            {/* Navigation Tabs for Admin */}
-                            {isAdmin && (
-                                <div className="mt-6 space-y-2">
-                                    <button
-                                        onClick={() => setActiveTab('profile')}
-                                        className={`w-full py-2 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 ${
-                                            activeTab === 'profile' 
-                                                ? 'bg-gradient-to-r from-pink-500 to-violet-500 text-white' 
-                                                : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                                        }`}
-                                    >
-                                        <span>👤</span>
-                                        <span>Profile</span>
-                                    </button>
-                                    <button
-                                        onClick={() => setActiveTab('users')}
-                                        className={`w-full py-2 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 ${
-                                            activeTab === 'users' 
-                                                ? 'bg-gradient-to-r from-pink-500 to-violet-500 text-white' 
-                                                : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                                        }`}
-                                    >
-                                        <span>👥</span>
-                                        <span>Manage Users</span>
-                                    </button>
-                                    <button
-                                        onClick={() => setActiveTab('movies')}
-                                        className={`w-full py-2 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 ${
-                                            activeTab === 'movies' 
-                                                ? 'bg-gradient-to-r from-pink-500 to-violet-500 text-white' 
-                                                : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                                        }`}
-                                    >
-                                        <span>🎬</span>
-                                        <span>Manage Movies</span>
-                                    </button>
-                                </div>
-                            )}
-                            
-                            {/* Action Buttons */}
-                            <div className="mt-6 space-y-3">
+                            {/* Navigation Tabs */}
+                            <div className="mt-6 space-y-2">
+                                <button
+                                    onClick={() => setActiveTab('profile')}
+                                    className={`w-full py-2 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 ${
+                                        activeTab === 'profile' 
+                                            ? 'bg-gradient-to-r from-pink-500 to-violet-500 text-white' 
+                                            : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                                    }`}
+                                >
+                                   
+                                    <span>Profile</span>
+                                </button>
                                 {!isAdmin && (
-                                    <Link
-                                        to="/watchlist"
-                                        className="w-full py-3 bg-gradient-to-r from-pink-500/20 to-violet-500/20 border border-pink-500/30 rounded-xl text-white font-medium hover:from-pink-500/30 hover:to-violet-500/30 transition-all duration-300 flex items-center justify-center space-x-2"
-                                    >
-                                        <span>📋</span>
-                                        <span>View Watchlist</span>
-                                    </Link>
+                                    <>
+                                        <button
+                                            onClick={() => setActiveTab('watchlist')}
+                                            className={`w-full py-2 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 ${
+                                                activeTab === 'watchlist' 
+                                                    ? 'bg-gradient-to-r from-pink-500 to-violet-500 text-white' 
+                                                    : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                                            }`}
+                                        >
+                                           
+                                            <span>Watchlist</span>
+                                        </button>
+                                        <button
+                                            onClick={() => setActiveTab('reviews')}
+                                            className={`w-full py-2 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 ${
+                                                activeTab === 'reviews' 
+                                                    ? 'bg-gradient-to-r from-pink-500 to-violet-500 text-white' 
+                                                    : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                                            }`}
+                                        >
+                                            
+                                            <span>My Reviews</span>
+                                        </button>
+                                    </>
                                 )}
+                                {isAdmin && (
+                                    <>
+                                        <button
+                                            onClick={() => setActiveTab('users')}
+                                            className={`w-full py-2 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 ${
+                                                activeTab === 'users' 
+                                                    ? 'bg-gradient-to-r from-pink-500 to-violet-500 text-white' 
+                                                    : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                                            }`}
+                                        >
+                                            <span>👥</span>
+                                            <span>Manage Users</span>
+                                        </button>
+                                        <button
+                                            onClick={() => setActiveTab('movies')}
+                                            className={`w-full py-2 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 ${
+                                                activeTab === 'movies' 
+                                                    ? 'bg-gradient-to-r from-pink-500 to-violet-500 text-white' 
+                                                    : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                                            }`}
+                                        >
+                                            <span>🎬</span>
+                                            <span>Manage Movies</span>
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                            
+                            {/* Logout Button */}
+                            <div className="mt-6">
                                 <button
                                     onClick={handleLogout}
                                     className="w-full py-3 bg-red-500/20 border border-red-500/30 rounded-xl text-red-400 font-medium hover:bg-red-500/30 transition-all duration-300 flex items-center justify-center space-x-2"
@@ -483,6 +502,7 @@ const ProfilePage = () => {
 
                     {/* Main Content */}
                     <div className="lg:col-span-2">
+                        {/* Profile Tab */}
                         {activeTab === 'profile' && (
                             <div className="space-y-6">
                                 {/* Admin Dashboard Stats */}
@@ -528,6 +548,74 @@ const ProfilePage = () => {
                                                     </div>
                                                     <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
                                                         <span className="text-2xl">🎬</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {/* User Stats - Only for regular users */}
+                                {!isAdmin && (
+                                    <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10 shadow-xl">
+                                        <div className="flex items-center justify-between mb-6">
+                                            <h3 className="text-2xl font-bold text-white flex items-center space-x-2">
+                                                <span>📊</span>
+                                                <span>My Statistics</span>
+                                            </h3>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-xl p-6 border border-purple-500/20">
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <p className="text-purple-300 text-sm font-medium mb-1">Movies Saved</p>
+                                                        <p className="text-3xl font-bold text-white">
+                                                            {statsLoading ? (
+                                                                <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                                            ) : (
+                                                                userStats.watchlistItems || 0
+                                                            )}
+                                                        </p>
+                                                    </div>
+                                                    <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                                                        <span className="text-2xl">📋</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-xl p-6 border border-blue-500/20">
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <p className="text-blue-300 text-sm font-medium mb-1">Movies Watched</p>
+                                                        <p className="text-3xl font-bold text-white">
+                                                            {statsLoading ? (
+                                                                <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                                            ) : (
+                                                                userStats.moviesWatched || 0
+                                                            )}
+                                                        </p>
+                                                    </div>
+                                                    <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                                                        <span className="text-2xl">🎬</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-xl p-6 border border-green-500/20">
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <p className="text-green-300 text-sm font-medium mb-1">Reviews Written</p>
+                                                        <p className="text-3xl font-bold text-white">
+                                                            {statsLoading ? (
+                                                                <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                                            ) : (
+                                                                userStats.reviewsWritten || 0
+                                                            )}
+                                                        </p>
+                                                    </div>
+                                                    <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
+                                                        <span className="text-2xl">⭐</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -678,6 +766,122 @@ const ProfilePage = () => {
                                 </div>
                             </div>
                         )}
+
+                        {/* Watchlist Tab - For Regular Users */}
+                        {activeTab === 'watchlist' && !isAdmin && (
+                            <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10 shadow-xl">
+                                <div className="flex items-center justify-between mb-6">
+                                    <h3 className="text-2xl font-bold text-white flex items-center space-x-2">
+                                        <span>📋</span>
+                                        <span>My Watchlist</span>
+                                    </h3>
+                                    
+                                </div>
+                                
+                                <div className="text-center py-12">
+                                    <div className="text-6xl mb-4">📋</div>
+                                    <h4 className="text-xl font-semibold text-white mb-2">Watchlist Overview</h4>
+                                    <div className="mb-6">
+                                        <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-full mb-4">
+                                            <span className="text-purple-300 text-sm font-medium">
+                                                {statsLoading ? (
+                                                    <div className="flex items-center">
+                                                        <div className="w-4 h-4 border-2 border-purple-300/30 border-t-purple-300 rounded-full animate-spin mr-2"></div>
+                                                        Loading...
+                                                    </div>
+                                                ) : (
+                                                    `${userStats.watchlistItems || 0} movies saved`
+                                                )}
+                                            </span>
+                                        </div>
+                                        <p className="text-gray-400">Click "View Full Watchlist" to see all your saved movies</p>
+                                    </div>
+                                    <Link
+                                        to="/watchlist"
+                                        className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-pink-500 to-violet-500 rounded-xl text-white font-semibold hover:from-pink-600 hover:to-violet-600 transition-all duration-300"
+                                    >
+                                        <span>📋</span>
+                                        <span className="ml-2">Go to Watchlist</span>
+                                    </Link>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Reviews Tab - For Regular Users */}
+                        {activeTab === 'reviews' && !isAdmin && (
+                            <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10 shadow-xl">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="text-2xl font-bold text-white flex items-center space-x-2">
+                                        <span>⭐</span>
+                                        <span>My Reviews</span>
+                                    </h3>
+                                    <button
+                                        onClick={fetchUserReviews}
+                                        className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg text-white font-medium hover:from-blue-600 hover:to-cyan-600 transition-all duration-300"
+                                        disabled={reviewsLoading}
+                                    >
+                                        {reviewsLoading ? 'Loading...' : 'Refresh'}
+                                    </button>
+                                </div>
+
+                                {reviewsLoading ? (
+                                    <div className="text-center py-8">
+                                        <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
+                                        <p className="text-gray-400">Loading reviews...</p>
+                                    </div>
+                                ) : userReviews.length === 0 ? (
+                                    <div className="text-center py-8">
+                                        <div className="text-6xl mb-4">📝</div>
+                                        <h4 className="text-xl font-semibold text-white mb-2">No Reviews Yet</h4>
+                                        <p className="text-gray-400">You haven't written any reviews yet. Start watching movies and share your thoughts!</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {userReviews.map(review => (
+                                            <div key={review._id} className="p-4 bg-white/5 rounded-xl border border-white/10">
+                                                <div className="flex justify-between items-start mb-3">
+                                                    <div>
+                                                        <h4 className="text-white font-semibold text-lg">{review.movieTitle || 'Movie Title'}</h4>
+                                                        <div className="flex items-center space-x-2 mt-1">
+                                                            <div className="flex items-center">
+                                                                {[...Array(5)].map((_, i) => (
+                                                                    <span
+                                                                        key={i}
+                                                                        className={`text-lg ${
+                                                                            i < (review.rating || 0)
+                                                                                ? 'text-yellow-400'
+                                                                                : 'text-gray-600'
+                                                                        }`}
+                                                                    >
+                                                                        ⭐
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                            <span className="text-gray-400 text-sm">
+                                                                {review.rating || 0}/5
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right flex items-center space-x-2">
+                                                        
+                                                        <button
+                                                            onClick={() => handleDeleteReview(review._id)}
+                                                            className="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all duration-300"
+                                                            title="Delete Review"
+                                                        >
+                                                            <span className="text-lg"><MdDelete /></span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <p className="text-gray-300 leading-relaxed">
+                                                    {review.comment || review.review || 'No comment provided'}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                         
                         {/* Admin Users Management */}
                         {activeTab === 'users' && isAdmin && (
@@ -723,6 +927,7 @@ const ProfilePage = () => {
                                 )}
                             </div>
                         )}
+
                         
                         {/* Admin Movie Management */}
                         {activeTab === 'movies' && isAdmin && (
