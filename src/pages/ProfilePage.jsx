@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { setCredentials } from '../redux/slices/authSlice';
 import { API_BASE_URL } from '../utils/apiConfig';
+import { getMovies, deleteMovie } from '../services/movieService';
 
 const ProfilePage = () => {
     const { user, isAuthenticated } = useSelector(state => state.auth);
@@ -33,6 +34,9 @@ const ProfilePage = () => {
         synopsis: '',
         posterUrl: ''
     });
+    const [movies, setMovies] = useState([]);
+    const [moviesLoading, setMoviesLoading] = useState(false);
+    const [showAddMovieModal, setShowAddMovieModal] = useState(false);
     
     // User stats states
     const [userStats, setUserStats] = useState({
@@ -191,6 +195,11 @@ const ProfilePage = () => {
                     setUsers(data.users || []);
                 }
             }
+            
+            // Fetch movies only when on movies tab
+            if (activeTab === 'movies') {
+                fetchMovies();
+            }
         } catch (error) {
             console.error('Failed to fetch admin data:', error);
         } finally {
@@ -198,6 +207,19 @@ const ProfilePage = () => {
         }
     };
     
+    const fetchMovies = async () => {
+        setMoviesLoading(true);
+        try {
+            const moviesData = await getMovies();
+            setMovies(moviesData || []);
+        } catch (error) {
+            console.error('Failed to fetch movies:', error);
+            setMovies([]);
+        } finally {
+            setMoviesLoading(false);
+        }
+    };
+
     const handleDeleteUser = async (userId) => {
         if (!confirm('Are you sure you want to delete this user?')) return;
         
@@ -213,6 +235,19 @@ const ProfilePage = () => {
             }
         } catch (error) {
             console.error('Failed to delete user:', error);
+        }
+    };
+
+    const handleDeleteMovie = async (movieId) => {
+        if (!confirm('Are you sure you want to delete this movie?')) return;
+        
+        try {
+            await deleteMovie(movieId);
+            setMovies(movies.filter(movie => movie._id !== movieId));
+            alert('Movie deleted successfully!');
+        } catch (error) {
+            console.error('Failed to delete movie:', error);
+            alert('Failed to delete movie. Please try again.');
         }
     };
     
@@ -278,7 +313,9 @@ const ProfilePage = () => {
                     synopsis: '',
                     posterUrl: ''
                 });
+                setShowAddMovieModal(false);
                 alert('Movie added successfully!');
+                fetchMovies(); // Refresh the movies list
             }
         } catch (error) {
             console.error('Failed to add movie:', error);
@@ -690,81 +727,164 @@ const ProfilePage = () => {
                         {/* Admin Movie Management */}
                         {activeTab === 'movies' && isAdmin && (
                             <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10 shadow-xl">
-                                <h3 className="text-2xl font-bold text-white mb-6">Movie Management</h3>
-                                
-                                {/* Add Movie Form */}
-                                <div className="mb-8">
-                                    <h4 className="text-lg font-semibold text-white mb-4">Add New Movie</h4>
-                                    <form onSubmit={handleAddMovie} className="space-y-4">
-                                        <div className="grid md:grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
-                                                <input
-                                                    type="text"
-                                                    value={newMovie.title}
-                                                    onChange={(e) => setNewMovie({...newMovie, title: e.target.value})}
-                                                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500/50"
-                                                    required
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-300 mb-2">Genre</label>
-                                                <input
-                                                    type="text"
-                                                    value={newMovie.genre}
-                                                    onChange={(e) => setNewMovie({...newMovie, genre: e.target.value})}
-                                                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500/50"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-300 mb-2">Release Year</label>
-                                                <input
-                                                    type="number"
-                                                    value={newMovie.releaseYear}
-                                                    onChange={(e) => setNewMovie({...newMovie, releaseYear: e.target.value})}
-                                                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500/50"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-300 mb-2">Director</label>
-                                                <input
-                                                    type="text"
-                                                    value={newMovie.director}
-                                                    onChange={(e) => setNewMovie({...newMovie, director: e.target.value})}
-                                                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500/50"
-                                                />
-                                            </div>
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="text-2xl font-bold text-white">Movie Management</h3>
+                                    <button
+                                        onClick={() => setShowAddMovieModal(true)}
+                                        className="px-6 py-3 bg-gradient-to-r from-pink-500 to-violet-500 rounded-xl text-white font-semibold hover:from-pink-600 hover:to-violet-600 transition-all duration-300 flex items-center space-x-2"
+                                    >
+                                        <span>+</span>
+                                        <span>Add Movie</span>
+                                    </button>
+                                </div>
+
+                                {/* Movies List */}
+                                <div>
+                                    <h4 className="text-lg font-semibold text-white mb-4">Existing Movies</h4>
+                                    {moviesLoading ? (
+                                        <div className="text-center py-8">
+                                            <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
+                                            <p className="text-gray-400">Loading movies...</p>
                                         </div>
+                                    ) : movies.length === 0 ? (
+                                        <div className="text-center py-8">
+                                            <p className="text-gray-400">No movies found</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {movies.map(movie => (
+                                                <div key={movie._id} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10">
+                                                    <div className="flex items-center space-x-4">
+                                                        {movie.posterUrl && (
+                                                            <img 
+                                                                src={movie.posterUrl} 
+                                                                alt={movie.title}
+                                                                className="w-16 h-20 object-cover rounded-lg"
+                                                                onError={(e) => {
+                                                                    e.target.style.display = 'none';
+                                                                }}
+                                                            />
+                                                        )}
+                                                        <div>
+                                                            <h5 className="text-white font-semibold text-lg">{movie.title}</h5>
+                                                            <p className="text-gray-400 text-sm">{movie.genre} • {movie.releaseYear}</p>
+                                                            <p className="text-gray-400 text-sm">Director: {movie.director}</p>
+                                                            {movie.synopsis && (
+                                                                <p className="text-gray-300 text-sm mt-1 max-w-md truncate">{movie.synopsis}</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center space-x-2">
+                                                        <button
+                                                            onClick={() => handleDeleteMovie(movie._id)}
+                                                            className="px-3 py-1 bg-red-500/20 border border-red-500/30 rounded-lg text-red-400 text-sm hover:bg-red-500/30 transition-all duration-300"
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Add Movie Modal */}
+                {showAddMovieModal && (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                        <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                            <div className="p-6">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="text-2xl font-bold text-white">Add New Movie</h3>
+                                    <button
+                                        onClick={() => setShowAddMovieModal(false)}
+                                        className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300"
+                                    >
+                                        <span className="text-xl">✕</span>
+                                    </button>
+                                </div>
+
+                                <form onSubmit={handleAddMovie} className="space-y-4">
+                                    <div className="grid md:grid-cols-2 gap-4">
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-300 mb-2">Poster URL</label>
+                                            <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
                                             <input
-                                                type="url"
-                                                value={newMovie.posterUrl}
-                                                onChange={(e) => setNewMovie({...newMovie, posterUrl: e.target.value})}
+                                                type="text"
+                                                value={newMovie.title}
+                                                onChange={(e) => setNewMovie({...newMovie, title: e.target.value})}
+                                                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500/50"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-300 mb-2">Genre</label>
+                                            <input
+                                                type="text"
+                                                value={newMovie.genre}
+                                                onChange={(e) => setNewMovie({...newMovie, genre: e.target.value})}
                                                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500/50"
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-300 mb-2">Synopsis</label>
-                                            <textarea
-                                                value={newMovie.synopsis}
-                                                onChange={(e) => setNewMovie({...newMovie, synopsis: e.target.value})}
-                                                rows={4}
+                                            <label className="block text-sm font-medium text-gray-300 mb-2">Release Year</label>
+                                            <input
+                                                type="number"
+                                                value={newMovie.releaseYear}
+                                                onChange={(e) => setNewMovie({...newMovie, releaseYear: e.target.value})}
                                                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500/50"
                                             />
                                         </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-300 mb-2">Director</label>
+                                            <input
+                                                type="text"
+                                                value={newMovie.director}
+                                                onChange={(e) => setNewMovie({...newMovie, director: e.target.value})}
+                                                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500/50"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-300 mb-2">Poster URL</label>
+                                        <input
+                                            type="url"
+                                            value={newMovie.posterUrl}
+                                            onChange={(e) => setNewMovie({...newMovie, posterUrl: e.target.value})}
+                                            className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500/50"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-300 mb-2">Synopsis</label>
+                                        <textarea
+                                            value={newMovie.synopsis}
+                                            onChange={(e) => setNewMovie({...newMovie, synopsis: e.target.value})}
+                                            rows={4}
+                                            className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500/50"
+                                        />
+                                    </div>
+                                    <div className="flex justify-end space-x-4 pt-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowAddMovieModal(false)}
+                                            className="px-6 py-3 bg-white/10 border border-white/20 rounded-xl text-white font-semibold hover:bg-white/20 transition-all duration-300"
+                                        >
+                                            Cancel
+                                        </button>
                                         <button
                                             type="submit"
                                             className="px-6 py-3 bg-gradient-to-r from-pink-500 to-violet-500 rounded-xl text-white font-semibold hover:from-pink-600 hover:to-violet-600 transition-all duration-300"
                                         >
                                             Add Movie
                                         </button>
-                                    </form>
-                                </div>
+                                    </div>
+                                </form>
                             </div>
-                        )}
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
         </div>
     );

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { MdDelete } from "react-icons/md";
 
 const MovieCard = ({ movie, showActions = false, onRemove }) => {
     return (
@@ -74,7 +75,7 @@ const MovieCard = ({ movie, showActions = false, onRemove }) => {
                             className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-all duration-300"
                             title="Remove from watchlist"
                         >
-                            <span className="text-lg">🗑️</span>
+                            <span className="text-xl"><MdDelete /></span>
                         </button>
                     )}
                 </div>

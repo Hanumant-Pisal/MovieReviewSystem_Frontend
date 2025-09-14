@@ -24,6 +24,30 @@ export const fetchMovieById = async (imdbID) => {
 export const fetchMovies = () =>
     axios.get(`${API_BASE_URL}/movies`);
 
+export const getMovies = async () => {
+    try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`${API_BASE_URL}/movies`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        return response.data;
+    } catch (error) {
+        throw new Error('Failed to fetch movies');
+    }
+};
+
+export const deleteMovie = async (movieId) => {
+    try {
+        const token = localStorage.getItem('token');
+        const response = await axios.delete(`${API_BASE_URL}/admin/movies/${movieId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        return response.data;
+    } catch (error) {
+        throw new Error('Failed to delete movie');
+    }
+};
+
 export const submitReview = (movieId, reviewData) =>
     axios.post(`${API_BASE_URL}/movies/${movieId}/reviews`, reviewData, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
