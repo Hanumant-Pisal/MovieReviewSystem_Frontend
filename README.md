@@ -74,7 +74,7 @@ Make sure you have the following installed:
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/Hanumant-Pisal/Movie-Review-System.git
+   git clone https://github.com/Hanumant-Pisal/MovieReviewSystem_Frontend
    cd Movie-Review-System/frontend
    ```
 
